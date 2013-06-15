@@ -775,6 +775,57 @@ exit:
 	return err;
 }
 
+#ifdef CONFIG_IPC_CMC22x_OLD_RFS
+static int rx_rfs_packet(struct io_device *iod, struct link_device *ld,
+					const char *data, unsigned size)
+{
+	int err = 0;
+	int pad = 0;
+	int rcvd = 0;
+	struct sk_buff *skb;
+
+	if (data[0] != HDLC_START) {
+		mif_err("Dropping RFS packet ... "
+		       "size = %d, start = %02X %02X %02X %02X\n",
+			size,
+			data[0], data[1], data[2], data[3]);
+		return -EINVAL;
+	}
+
+	if (data[size-1] != HDLC_END) {
+		for (pad = 1; pad < 4; pad++)
+			if (data[(size-1)-pad] == HDLC_END)
+				break;
+
+		if (pad >= 4) {
+			char *b = (char *)data;
+			unsigned sz = size;
+			mif_err("size %d, No END_FLAG!!!\n", size);
+			mif_err("end = %02X %02X %02X %02X\n",
+				b[sz-4], b[sz-3], b[sz-2], b[sz-1]);
+			return -EINVAL;
+		} else {
+			mif_info("padding = %d\n", pad);
+		}
+	}
+
+	skb = rx_alloc_skb(size, iod, ld);
+	if (unlikely(!skb)) {
+		mif_err("alloc_skb fail\n");
+		return -ENOMEM;
+	}
+
+	/* copy the RFS haeder to skb->data */
+	rcvd = size - sizeof(hdlc_start) - sizeof(hdlc_end) - pad;
+	memcpy(skb_put(skb, rcvd), ((char *)data + sizeof(hdlc_start)), rcvd);
+
+	fragdata(iod, ld)->skb_recv = skb;
+	err = rx_iodev_skb(fragdata(iod, ld)->skb_recv);
+
+	return err;
+}
+#endif
+
 /* called from link device when a packet arrives for this io device */
 static int io_dev_recv_data_from_link_dev(struct io_device *iod,
 		struct link_device *ld, const char *data, unsigned int len)
