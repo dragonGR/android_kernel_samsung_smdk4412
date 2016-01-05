@@ -290,7 +290,11 @@ static void hotplug_timer(struct work_struct *work)
 		cpu_up(select_off_cpu);
 		DBG_PRINT("cpu%d on\n", select_off_cpu);
 		hotpluging_rate = CHECK_DELAY_ON;
-	} else if (flag_hotplug == HOTPLUG_OUT && cpu_online(cpu_rq_min) == CPU_ON) {
+	} else if (
+		flag_hotplug == HOTPLUG_OUT
+		&& cpu_rq_min != 0
+		&& cpu_online(cpu_rq_min) == CPU_ON
+	) {
 		DBG_PRINT("cpu%d turnning off!\n", cpu_rq_min);
 		cpu_down(cpu_rq_min);
 		DBG_PRINT("cpu%d off!\n", cpu_rq_min);
